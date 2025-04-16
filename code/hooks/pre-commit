@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Format all staged Python files with autopep8
+echo "Formatting Python files with autopep8..."
+staged_python_files=$(git diff --cached --name-only --diff-filter=d | grep -E '\.py$')
+
+if [[ -n "$staged_python_files" ]]; then
+    for file in $staged_python_files; do
+        autopep8 --in-place "$file"
+        git add "$file"
+    done
+    echo "Autopep8 formatting applied."
+else
+    echo "No Python files to format."
+fi
+
+# Check code style with flake8
+echo "Running flake8 checks..."
+if [[ -n "$staged_python_files" ]]; then
+    flake8 $staged_python_files
+    if [[ $? -ne 0 ]]; then
+        echo "flake8 found issues. Please fix them and re-stage your files."
+        exit 1
+    fi
+else
+    echo "No Python files to lint."
+fi
+
+# Run unittest tests
+echo "Running tests using unittest..."
+python -m unittest discover -s tests -p "test_*.py"
+
+if [[ $? -ne 0 ]]; then
+    echo "Tests failed. Commit aborted."
+    exit 1
+fi
+
+# Generate or update environment.yml
+echo "Generating environment.yml..."
+conda env export --no-builds > environment.yml
+
+if [[ $? -ne 0 ]]; then
+    echo "Failed to generate environment.yml. Ensure you have Conda installed and a valid environment activated."
+    exit 1
+fi
+
+git add environment.yml
+echo "environment.yml updated and staged."
+
+exit 0
